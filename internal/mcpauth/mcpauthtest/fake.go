@@ -65,6 +65,10 @@ type Fake struct {
 	// registration response lets it: the token endpoint takes it as
 	// registered
 	Assign string
+	// PathAppendMetadata serves the authorization server metadata at
+	// <issuer>/.well-known/oauth-authorization-server instead of RFC 8414's
+	// path-inserted URL, while root /.well-known/ paths return an HTML page.
+	PathAppendMetadata bool
 
 	refuse  bool // RefuseTokens
 	codes   map[string]codeGrant
@@ -103,7 +107,7 @@ func New(t *testing.T) *Fake {
 		}
 		json.NewEncoder(w).Encode(map[string]any{"resource": f.URL, "authorization_servers": []string{issuer}, "scopes_supported": scopes})
 	})
-	mux.HandleFunc("/.well-known/oauth-authorization-server/oauth", func(w http.ResponseWriter, r *http.Request) {
+	writeASMetadata := func(w http.ResponseWriter) {
 		m := map[string]any{
 			"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token",
 			"registration_endpoint": issuer + "/register", "code_challenge_methods_supported": []string{"S256"},
@@ -117,6 +121,29 @@ func New(t *testing.T) *Fake {
 			m["grant_types_supported"] = []string{"authorization_code", "refresh_token"}
 		}
 		json.NewEncoder(w).Encode(m)
+	}
+	mux.HandleFunc("/.well-known/oauth-authorization-server/oauth", func(w http.ResponseWriter, r *http.Request) {
+		if f.PathAppendMetadata {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			io.WriteString(w, "<!doctype html><html><body>SPA</body></html>")
+			return
+		}
+		writeASMetadata(w)
+	})
+	mux.HandleFunc("/.well-known/openid-configuration/oauth", func(w http.ResponseWriter, r *http.Request) {
+		if f.PathAppendMetadata {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			io.WriteString(w, "<!doctype html><html><body>SPA</body></html>")
+			return
+		}
+		http.NotFound(w, r)
+	})
+	mux.HandleFunc("/oauth/.well-known/oauth-authorization-server", func(w http.ResponseWriter, r *http.Request) {
+		if !f.PathAppendMetadata {
+			http.NotFound(w, r)
+			return
+		}
+		writeASMetadata(w)
 	})
 	register := func(w http.ResponseWriter, r *http.Request) {
 		var reg map[string]any

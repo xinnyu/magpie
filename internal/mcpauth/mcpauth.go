@@ -804,8 +804,12 @@ func discover(ctx context.Context, serverURL string) (meta, error) {
 	}
 	var asTries []string
 	if p := strings.TrimRight(iu.Path, "/"); p != "" {
-		asTries = []string{origin(iu) + "/.well-known/oauth-authorization-server" + p,
-			origin(iu) + "/.well-known/openid-configuration" + p, issuer + "/.well-known/openid-configuration"}
+		asTries = []string{
+			origin(iu) + "/.well-known/oauth-authorization-server" + p,
+			origin(iu) + "/.well-known/openid-configuration" + p,
+			issuer + "/.well-known/openid-configuration",
+			issuer + "/.well-known/oauth-authorization-server",
+		}
 	} else {
 		asTries = []string{issuer + "/.well-known/oauth-authorization-server", issuer + "/.well-known/openid-configuration"}
 	}
